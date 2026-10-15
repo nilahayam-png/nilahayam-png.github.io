@@ -1,20 +1,539 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
 <meta charset="utf-8">
-<title>Sona AI</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:system-ui,"Segoe UI",Tahoma,sans-serif;background:#FFF7EC;color:#2B2A28;line-height:1.8;margin:0}main{max-width:720px;margin:0 auto;padding:24px 16px 64px}h1{color:#1F7A6B;font-size:1.7rem}h2{color:#155A4F;font-size:1.15rem;margin-top:1.8em}a{color:#1F7A6B}hr{border:0;border-top:2px solid #F1E3CC;margin:48px 0}.muted{color:#7A746B;font-size:.95rem}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>رحلة الكلمات – Word Voyage</title>
+<style>
+  :root{
+    --bg1:#1d2b53; --bg2:#3a2c6b; --accent:#f5b83d; --cell:#fffaf0; --cellEmpty:rgba(255,255,255,.18);
+    --text:#fff; --ink:#2b2140; --ok:#4cc38a; --bad:#e5564b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden}
+  body{font-family:system-ui,"Segoe UI",Tahoma,"Noto Sans Arabic",sans-serif;color:var(--text);
+       background:linear-gradient(160deg,var(--bg1),var(--bg2));user-select:none;-webkit-user-select:none;touch-action:none}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column}
+  .screen.on{display:flex}
+  button{font:inherit;cursor:pointer;border:0}
+
+  /* language screen */
+  #lang{align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center}
+  #lang h1{font-size:clamp(28px,7vw,46px);margin:0 0 8px;letter-spacing:.5px}
+  #lang .globe{font-size:64px}
+  .bigbtn{background:var(--accent);color:var(--ink);font-weight:700;font-size:20px;padding:14px 26px;border-radius:16px;min-width:220px;
+          box-shadow:0 5px 0 #b9832a}
+  .bigbtn:active{transform:translateY(3px);box-shadow:0 2px 0 #b9832a}
+
+  /* header */
+  .bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:10px;flex:0 0 auto}
+  .pill{background:rgba(0,0,0,.25);border-radius:999px;padding:7px 14px;font-weight:700;display:flex;align-items:center;gap:6px;color:#fff}
+  .iconbtn{background:rgba(0,0,0,.25);color:#fff;border-radius:12px;padding:8px 12px;font-weight:700}
+  .title{font-weight:800;font-size:18px;text-align:center;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* map */
+  #map .scroll{flex:1;overflow-y:auto;padding:6px 16px 24px;touch-action:pan-y}
+  .continent{border-radius:20px;padding:14px;margin:12px 0;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .continent h2{margin:0 0 10px;font-size:22px}
+  .cities{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .city{background:rgba(255,255,255,.92);color:var(--ink);border-radius:14px;padding:12px 6px;font-weight:700;font-size:15px;
+        display:flex;flex-direction:column;align-items:center;gap:4px;min-height:72px;justify-content:center}
+  .city small{font-weight:600;opacity:.6;font-size:12px}
+  .city.locked{background:rgba(0,0,0,.25);color:rgba(255,255,255,.6)}
+  .city.current{outline:3px solid var(--accent);animation:pulse 1.4s infinite}
+  @keyframes pulse{50%{transform:scale(1.04)}}
+
+  /* game */
+  #gridWrap{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:8px;min-height:0}
+  #grid{display:grid;gap:4px}
+  .cell{width:var(--cs);height:var(--cs);border-radius:8px;background:var(--cellEmpty);display:flex;align-items:center;justify-content:center;
+        font-weight:800;font-size:calc(var(--cs)*.58);color:var(--ink)}
+  .cell.show{background:var(--cell);animation:pop .35s}
+  .cell.hint{background:#ffe7a8}
+  @keyframes pop{0%{transform:scale(.4)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
+  #preview{flex:0 0 46px;display:flex;align-items:center;justify-content:center}
+  #preview span{background:#fff;color:var(--ink);border-radius:12px;padding:4px 16px;font-size:26px;font-weight:800;min-width:40px;text-align:center;letter-spacing:2px}
+  #preview span:empty{visibility:hidden}
+  #preview.shake span{animation:shake .35s;background:#ffd5d0}
+  #preview.good span{background:#c9f5df}
+  @keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  #bottom{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:10px;padding:0 10px 18px}
+  .side{display:flex;flex-direction:column;gap:12px}
+  .round{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.9);color:var(--ink);font-size:22px;font-weight:800;
+         display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1;box-shadow:0 4px 0 rgba(0,0,0,.25)}
+  .round small{font-size:10px;margin-top:2px}
+  .round:active{transform:translateY(2px)}
+  #wheel{position:relative;width:var(--ws);height:var(--ws);border-radius:50%;background:rgba(255,255,255,.14);touch-action:none}
+  #wheel svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .ltr{position:absolute;width:var(--ls);height:var(--ls);margin:calc(var(--ls)/-2) 0 0 calc(var(--ls)/-2);border-radius:50%;
+       background:#fff;color:var(--ink);font-size:calc(var(--ls)*.5);font-weight:800;display:flex;align-items:center;justify-content:center;
+       transition:transform .1s, background .1s}
+  .ltr.sel{background:var(--accent);transform:scale(1.1)}
+
+  /* tutorial */
+  #hand{position:absolute;font-size:44px;pointer-events:none;z-index:3;transform:translate(-50%,-6%);filter:drop-shadow(0 3px 4px rgba(0,0,0,.4));display:none}
+  #tip{position:absolute;left:50%;top:-14px;transform:translate(-50%,-100%);background:#fff;color:var(--ink);font-weight:800;
+       padding:8px 16px;border-radius:14px;white-space:nowrap;z-index:3;display:none;box-shadow:0 4px 12px rgba(0,0,0,.3);font-size:16px}
+  #game{position:absolute}
+
+  /* overlay & toast */
+  #overlay{position:absolute;inset:0;background:rgba(10,10,30,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:5}
+  #overlay.on{display:flex}
+  .card{background:#fff;color:var(--ink);border-radius:22px;padding:26px 22px;text-align:center;max-width:340px;width:100%;animation:pop .4s}
+  .card .big{font-size:56px}
+  .card h3{margin:6px 0 4px;font-size:24px}
+  .card p{margin:0 0 18px;opacity:.75}
+  #toast{position:absolute;left:50%;top:70px;transform:translateX(-50%);background:rgba(0,0,0,.75);padding:8px 16px;border-radius:999px;
+         font-weight:700;opacity:0;transition:opacity .25s;pointer-events:none;z-index:6;white-space:nowrap}
+  #toast.on{opacity:1}
+</style>
 </head>
 <body>
-<main>
-<h1>Sona AI</h1>
-<p>تطبيقات أندرويد بسيطة ومفيدة.</p>
-<h2>تطبيقاتنا</h2>
-<ul>
-  <li>كلماتي (Kalimati) — <a href="kalimati-privacy.html">سياسة الخصوصية · Privacy Policy</a></li>
-</ul>
-<h2>للتواصل</h2>
-<p><a href="mailto:sona.ames.ai@gmail.com">sona.ames.ai@gmail.com</a></p>
-</main>
+
+<!-- Language -->
+<section id="lang" class="screen">
+  <div class="globe">🌍</div>
+  <h1>رحلة الكلمات<br><small style="font-size:.5em;opacity:.8">Voyage des mots · Word Voyage</small></h1>
+  <button class="bigbtn" data-lang="ar">العربية</button>
+  <button class="bigbtn" data-lang="fr">Français</button>
+  <button class="bigbtn" data-lang="en">English</button>
+</section>
+
+<!-- Map -->
+<section id="map" class="screen">
+  <div class="bar">
+    <div style="display:flex;gap:6px"><button class="iconbtn" id="btnLang">🌐</button><button class="iconbtn mute">🔊</button></div>
+    <div class="title" id="mapTitle"></div>
+    <div class="pill">🪙 <span class="coins"></span></div>
+  </div>
+  <div class="scroll" id="mapList"></div>
+</section>
+
+<!-- Game -->
+<section id="game" class="screen">
+  <div class="bar">
+    <div style="display:flex;gap:6px"><button class="iconbtn" id="btnBack">🗺️</button><button class="iconbtn mute">🔊</button></div>
+    <div class="title" id="cityTitle"></div>
+    <div class="pill">🪙 <span class="coins"></span></div>
+  </div>
+  <div id="gridWrap"><div id="grid"></div></div>
+  <div id="preview"><span id="word"></span></div>
+  <div id="bottom">
+    <div class="side">
+      <button class="round" id="btnShuffle" title="shuffle">🔀</button>
+    </div>
+    <div id="wheel"><svg id="lines"></svg><div id="hand">👆</div><div id="tip"></div></div>
+    <div class="side">
+      <button class="round" id="btnHint">💡<small>25</small></button>
+      <button class="round" id="btnAd">🎬<small>+25</small></button>
+    </div>
+  </div>
+</section>
+
+<div id="overlay"><div class="card" id="ovCard"></div></div>
+<div id="toast"></div>
+
+<script>
+/*CORE-START*/
+const WORLD = [
+  { id:"africa", color:"linear-gradient(135deg,#e8913d,#c4532f)",
+    name:{ar:"إفريقيا",fr:"Afrique",en:"Africa"},
+    cities:[{ar:"مراكش",fr:"Marrakech",en:"Marrakech"},{ar:"القاهرة",fr:"Le Caire",en:"Cairo"},{ar:"تونس",fr:"Tunis",en:"Tunis"},
+            {ar:"داكار",fr:"Dakar",en:"Dakar"},{ar:"نيروبي",fr:"Nairobi",en:"Nairobi"},{ar:"كيب تاون",fr:"Le Cap",en:"Cape Town"}]},
+  { id:"europe", color:"linear-gradient(135deg,#4a7fd6,#2e4fa3)",
+    name:{ar:"أوروبا",fr:"Europe",en:"Europe"},
+    cities:[{ar:"باريس",fr:"Paris",en:"Paris"},{ar:"روما",fr:"Rome",en:"Rome"},{ar:"برشلونة",fr:"Barcelone",en:"Barcelona"},
+            {ar:"لندن",fr:"Londres",en:"London"},{ar:"أثينا",fr:"Athènes",en:"Athens"},{ar:"إسطنبول",fr:"Istanbul",en:"Istanbul"}]},
+  { id:"asia", color:"linear-gradient(135deg,#d64a7f,#8e2e8c)",
+    name:{ar:"آسيا",fr:"Asie",en:"Asia"},
+    cities:[{ar:"دبي",fr:"Dubaï",en:"Dubai"},{ar:"الدوحة",fr:"Doha",en:"Doha"},{ar:"مومباي",fr:"Bombay",en:"Mumbai"},
+            {ar:"بكين",fr:"Pékin",en:"Beijing"},{ar:"طوكيو",fr:"Tokyo",en:"Tokyo"},{ar:"بالي",fr:"Bali",en:"Bali"}]},
+  { id:"americas", color:"linear-gradient(135deg,#2fa37a,#1d6b5c)",
+    name:{ar:"الأمريكيتان",fr:"Amériques",en:"Americas"},
+    cities:[{ar:"نيويورك",fr:"New York",en:"New York"},{ar:"تورونتو",fr:"Toronto",en:"Toronto"},{ar:"مكسيكو",fr:"Mexico",en:"Mexico City"},
+            {ar:"ليما",fr:"Lima",en:"Lima"},{ar:"ريو دي جانيرو",fr:"Rio de Janeiro",en:"Rio de Janeiro"},{ar:"بوينس آيرس",fr:"Buenos Aires",en:"Buenos Aires"}]},
+  { id:"oceania", color:"linear-gradient(135deg,#2aa6c9,#1f5f99)",
+    name:{ar:"أوقيانوسيا",fr:"Océanie",en:"Oceania"},
+    cities:[{ar:"سيدني",fr:"Sydney",en:"Sydney"},{ar:"ملبورن",fr:"Melbourne",en:"Melbourne"},{ar:"بيرث",fr:"Perth",en:"Perth"},
+            {ar:"أوكلاند",fr:"Auckland",en:"Auckland"},{ar:"فيجي",fr:"Fidji",en:"Fiji"},{ar:"تاهيتي",fr:"Tahiti",en:"Tahiti"}]}
+];
+
+// One level per city, in WORLD order. letters = the wheel; words = answers (must use only wheel letters).
+const LEVELS = {
+  ar:[
+    {letters:"بحر",   words:["بحر","حرب","ربح"]},
+    {letters:"قمر",   words:["قمر","رقم","مقر"]},
+    {letters:"علم",   words:["علم","عمل","لمع"]},
+    {letters:"كتاب",  words:["كتاب","كتب","تاب","بات"]},
+    {letters:"سافر",  words:["سافر","سفر","فرس","سار"]},
+    {letters:"جبال",  words:["جبال","جبل","بال"]},
+    {letters:"نجوم",  words:["نجوم","نجم","موج"]},
+    {letters:"سماء",  words:["سماء","ماء","سام"]},
+    {letters:"رحلة",  words:["رحلة","رحل","حرة"]},
+    {letters:"شارع",  words:["شارع","شرع","عرش","شاع"]},
+    {letters:"كرسي",  words:["كرسي","كسر","سكر"]},
+    {letters:"مطار",  words:["مطار","مطر","طار"]},
+    {letters:"قطار",  words:["قطار","قطر","طار"]},
+    {letters:"جمال",  words:["جمال","جمل","مال"]},
+    {letters:"ساحل",  words:["ساحل","حال","سال"]},
+    {letters:"سلام",  words:["سلام","سلم","سام"]},
+    {letters:"عالم",  words:["عالم","علم","عمل","لمع","عام","مال"]},
+    {letters:"ملعب",  words:["ملعب","لعب","علم","عمل","لمع"]},
+    {letters:"نهار",  words:["نهار","رهان","نهر","رهن"]},
+    {letters:"مشرق",  words:["مشرق","شرق","قمر","رقم"]},
+    {letters:"مدينة", words:["مدينة","دين","مدة","نية"]},
+    {letters:"مدرسة", words:["مدرسة","درس","سرد","مدة"]},
+    {letters:"صحراء", words:["صحراء","حار","راح","صار"]},
+    {letters:"حديقة", words:["حديقة","قيد","حدة"]},
+    {letters:"سفينة", words:["سفينة","نفس","سفن"]},
+    {letters:"جزيرة", words:["جزيرة","جزر","جرة"]},
+    {letters:"خريطة", words:["خريطة","طير","خير"]},
+    {letters:"بستان", words:["بستان","نبات","بنت","سبت"]},
+    {letters:"مسافر", words:["مسافر","سافر","سفر","فرس","سار"]},
+    {letters:"مغامرة",words:["مغامرة","غرام","غمر","مرة"]}
+  ],
+  fr:[
+    {letters:"RAME",   words:["RAME","ARME","AMER","MARE","MER"]},
+    {letters:"LUNE",   words:["LUNE","NUL","UNE"]},
+    {letters:"PORT",   words:["PORT","TROP","POT","TOP"]},
+    {letters:"ROUTE",  words:["ROUTE","TOUR","ROUE","TROU","RUE"]},
+    {letters:"PLAGE",  words:["PLAGE","PAGE","PALE","GEL","AGE"]},
+    {letters:"CARTE",  words:["CARTE","TRACE","ACTE","RACE","ARC","CAR"]},
+    {letters:"MONDE",  words:["MONDE","DEMON","MODE","NOM","DON","ODE"]},
+    {letters:"PONTS",  words:["PONTS","PONT","STOP","TON","SON","POT"]},
+    {letters:"SABLE",  words:["SABLE","SALE","BAL","BAS","SEL"]},
+    {letters:"OCEAN",  words:["OCEAN","CANOE","CANE","CONE","ANE"]},
+    {letters:"NEIGE",  words:["NEIGE","GENIE","GENE","NEE"]},
+    {letters:"VOILE",  words:["VOILE","VIOLE","VOLE","LOI","OIE"]},
+    {letters:"ETOILE", words:["ETOILE","TOILE","TOI","LOI"]},
+    {letters:"CHEMIN", words:["CHEMIN","CHIEN","NICHE","MINE"]},
+    {letters:"JARDIN", words:["JARDIN","DINAR","RAID","NID"]},
+    {letters:"VALISE", words:["VALISE","VALSE","VILE","LAVE","SALE"]},
+    {letters:"ORANGE", words:["ORANGE","ORGANE","ORAGE","RANGE","ANGE","NAGE","RAGE"]},
+    {letters:"CAMION", words:["CAMION","COIN","MAIN","AMI"]},
+    {letters:"SOURCE", words:["SOURCE","COURSE","SUCRE","COURS","ROSE","CURE"]},
+    {letters:"MARCHE", words:["MARCHE","CHARME","ARCHE","CHER","CHAR","MER"]},
+    {letters:"LIVRES", words:["LIVRES","LIVRE","VERS","LIRE","SEL"]},
+    {letters:"PIRATE", words:["PIRATE","PATRIE","PARTIE","TAPIR","PIRE","RATE","TAPE","AIR"]},
+    {letters:"MARINE", words:["MARINE","MARIN","AIMER","MAIRE","MINE","NIER"]},
+    {letters:"BATEAU", words:["BATEAU","BEAU","TUBE","BUT"]},
+    {letters:"AVIONS", words:["AVIONS","AVION","SAVON","AVIS","VINS"]},
+    {letters:"RIVAGE", words:["RIVAGE","VIRAGE","RAGE","GARE","RAVI","AGE","VIE"]},
+    {letters:"PAYSAGE",words:["PAYSAGE","PAGES","PAYS","PAGE","SAGE"]},
+    {letters:"COLLINE",words:["COLLINE","COLLE","CLONE","LION","LOIN"]},
+    {letters:"HORIZON",words:["HORIZON","NOIR","ZOO","ROI"]},
+    {letters:"AVENTURE",words:["AVENTURE","AVENUE","NATURE","VENTRE","TENUE","VENUE"]}
+  ],
+  en:[
+    {letters:"TEA",    words:["TEA","EAT","ATE"]},
+    {letters:"SEAT",   words:["SEAT","EAST","EAT","SEA","TEA","SAT"]},
+    {letters:"STAR",   words:["STAR","RATS","ARTS","TAR","RAT","ART"]},
+    {letters:"ROAD",   words:["ROAD","ROD","OAR"]},
+    {letters:"STONE",  words:["STONE","NOTE","TONE","NEST","ONE","TEN","SET"]},
+    {letters:"HORSE",  words:["HORSE","SHORE","HERO","ROSE","SHOE","HER"]},
+    {letters:"OCEAN",  words:["OCEAN","CANOE","CONE","ONCE","CAN"]},
+    {letters:"BEACH",  words:["BEACH","EACH","ACHE"]},
+    {letters:"TRAIN",  words:["TRAIN","RAIN","AIR","ART","TAN","TIN"]},
+    {letters:"PLANET", words:["PLANET","PLANE","PLANT","PLATE","LEAN","NET","PEN","TAP"]},
+    {letters:"GARDEN", words:["GARDEN","DANGER","RANGE","GRADE","READ","AGE","END","RED"]},
+    {letters:"TRAVEL", words:["TRAVEL","ALERT","LATER","RATE","TALE","ART","EAR"]},
+    {letters:"ISLAND", words:["ISLAND","SNAIL","LAND","SAND","SAID","AID"]},
+    {letters:"CASTLE", words:["CASTLE","SCALE","LACE","SALT","LAST","CAT"]},
+    {letters:"BRIDGE", words:["BRIDGE","BRIDE","RIDGE","BIRD","RIDE","DIG","RIB"]},
+    {letters:"FOREST", words:["FOREST","FOSTER","SOFTER","STORE","FORT","REST","ROSE","SOFT"]},
+    {letters:"DESERT", words:["DESERT","RESTED","TREES","STEER","REST","DEER"]},
+    {letters:"MARKET", words:["MARKET","MAKER","TAKER","MAKE","TEAM","MEAT","TAKE"]},
+    {letters:"SUNSET", words:["SUNSET","TUNES","NEST","SUN","SET"]},
+    {letters:"TEMPLE", words:["TEMPLE","MEET","MELT","PELT"]},
+    {letters:"PALACE", words:["PALACE","PLACE","LACE","PACE","CAPE","LEAP"]},
+    {letters:"HARBOR", words:["HARBOR","ROAR","BOAR","BAR","OAR"]},
+    {letters:"JUNGLE", words:["JUNGLE","LUNGE","GLUE","LUNG","JUG"]},
+    {letters:"TICKET", words:["TICKET","KITE","TICK","KIT"]},
+    {letters:"VILLAGE",words:["VILLAGE","VILLA","GALE","LIVE","EVIL","VEIL"]},
+    {letters:"COMPASS",words:["COMPASS","CAMPS","SOAP","MOSS","MAPS"]},
+    {letters:"AIRPORT",words:["AIRPORT","PARROT","PATIO","TAPIR","TRIP","PORT"]},
+    {letters:"EXPLORE",words:["EXPLORE","PEER","ROPE","ROLE","POLE"]},
+    {letters:"HORIZON",words:["HORIZON","RHINO","IRON","ZOO"]},
+    {letters:"MOUNTAIN",words:["MOUNTAIN","AMOUNT","NATION","MINT","MOAN","UNIT"]}
+  ]
+};
+
+// Crossword builder: places words on a grid with crossings. Returns placed words + bonus (unplaceable) words.
+function buildGrid(words){
+  const list = [...words].map(w=>Array.from(w)).sort((a,b)=>b.length-a.length);
+  const cells = new Map(), placed = [], bonus = [];
+  const K = (r,c)=>r+","+c;
+  function check(w,r,c,dir){
+    const dr = dir==="v"?1:0, dc = dir==="h"?1:0;
+    if(cells.has(K(r-dr,c-dc)) || cells.has(K(r+dr*w.length,c+dc*w.length))) return -1;
+    let cross = 0;
+    for(let i=0;i<w.length;i++){
+      const rr=r+dr*i, cc=c+dc*i, cell=cells.get(K(rr,cc));
+      if(cell){ if(cell.ch!==w[i] || cell[dir]) return -1; cross++; }
+      else if(cells.has(K(rr+dc,cc+dr)) || cells.has(K(rr-dc,cc-dr))) return -1;
+    }
+    return cross;
+  }
+  function put(w,r,c,dir){
+    const dr = dir==="v"?1:0, dc = dir==="h"?1:0;
+    for(let i=0;i<w.length;i++){
+      const k=K(r+dr*i,c+dc*i); const cell=cells.get(k)||{ch:w[i]}; cell[dir]=true; cells.set(k,cell);
+    }
+    placed.push({w,r,c,dir});
+  }
+  function area(){ let a=1e9,b=-1e9,x=1e9,y=-1e9;
+    for(const k of cells.keys()){const [r,c]=k.split(",").map(Number);a=Math.min(a,r);b=Math.max(b,r);x=Math.min(x,c);y=Math.max(y,c);}
+    return {minR:a,maxR:b,minC:x,maxC:y}; }
+  put(list[0],0,0,"h");
+  for(const w of list.slice(1)){
+    let best=null;
+    for(const p of placed){
+      for(let i=0;i<p.w.length;i++) for(let j=0;j<w.length;j++){
+        if(p.w[i]!==w[j]) continue;
+        const dir = p.dir==="h"?"v":"h";
+        const r = p.dir==="h" ? p.r-j : p.r+i;
+        const c = p.dir==="h" ? p.c+i : p.c-j;
+        const cross = check(w,r,c,dir); if(cross<1) continue;
+        const b = area();
+        const bb = {minR:Math.min(b.minR,r),maxR:Math.max(b.maxR,dir==="v"?r+w.length-1:r),
+                    minC:Math.min(b.minC,c),maxC:Math.max(b.maxC,dir==="h"?c+w.length-1:c)};
+        const h=bb.maxR-bb.minR+1, wd=bb.maxC-bb.minC+1;
+        const score = cross*100 - (h*wd) - Math.abs(h-wd)*2;
+        if(!best || score>best.score) best={r,c,dir,score};
+      }
+    }
+    if(best) put(w,best.r,best.c,best.dir); else bonus.push(w.join(""));
+  }
+  const b = area();
+  placed.forEach(p=>{p.r-=b.minR; p.c-=b.minC; p.word=p.w.join("");});
+  return {rows:b.maxR-b.minR+1, cols:b.maxC-b.minC+1, placed, bonus};
+}
+/*CORE-END*/
+
+const S = {
+  ar:{dir:"rtl",title:"رحلة الكلمات",done:"أكملت المدينة!",next:"المدينة التالية",map:"الخريطة",bonus:"كلمة إضافية! +1 🪙",
+      already:"وجدتها من قبل",noCoins:"لا تكفي العملات — شاهد إعلانًا 🎬",allDone:"أكملت كل المدن! مدن جديدة قريبًا ✈️",
+      ad:"+25 🪙 شكرًا!",earned:"+10 🪙",locked:"🔒"},
+  fr:{dir:"ltr",title:"Voyage des mots",done:"Ville terminée !",next:"Ville suivante",map:"Carte",bonus:"Mot bonus ! +1 🪙",
+      already:"Déjà trouvé",noCoins:"Pas assez de pièces — regarde une pub 🎬",allDone:"Toutes les villes terminées ! D'autres arrivent ✈️",
+      ad:"+25 🪙 merci !",earned:"+10 🪙",locked:"🔒"},
+  en:{dir:"ltr",title:"Word Voyage",done:"City complete!",next:"Next city",map:"Map",bonus:"Bonus word! +1 🪙",
+      already:"Already found",noCoins:"Not enough coins — watch an ad 🎬",allDone:"All cities done! More coming soon ✈️",
+      ad:"+25 🪙 thanks!",earned:"+10 🪙",locked:"🔒"}
+};
+
+/* ---------- save ---------- */
+const TIP = {ar:"اسحب إصبعك على الحروف لتكوين كلمة", fr:"Glisse ton doigt sur les lettres", en:"Swipe across the letters to make a word"};
+let save = {lang:null, progress:{ar:0,fr:0,en:0}, coins:50, sound:true, tutorial:false};
+try{ const s=JSON.parse(localStorage.getItem("wordVoyage")); if(s) save=Object.assign(save,s); }catch(e){}
+function persist(){ try{ localStorage.setItem("wordVoyage",JSON.stringify(save)); }catch(e){} }
+
+/* ---------- helpers ---------- */
+const $ = id=>document.getElementById(id);
+const T = ()=>S[save.lang];
+function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id)); }
+function updateCoins(){ document.querySelectorAll(".coins").forEach(e=>e.textContent=save.coins); }
+let toastT; function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),1500); }
+const CITY_LIST = WORLD.flatMap(cont=>cont.cities.map(city=>({cont,city})));
+function cityAt(i){ return CITY_LIST[i]; }
+
+/* ---------- sound (Web Audio, no files needed) ---------- */
+let AC=null;
+function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==="suspended") AC.resume(); return AC; }
+function tone(freq, start, dur, type="sine", vol=.18){
+  const a=ac(); if(!a||!save.sound) return;
+  const o=a.createOscillator(), g=a.createGain(), t=a.currentTime+start;
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.01); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t+dur+.02);
+}
+const SFX = {
+  tap:(n)=>tone(440*Math.pow(2,(n||0)/6),0,.09,"triangle",.12),
+  good:()=>[523,659,784].forEach((f,i)=>tone(f,i*.08,.18,"triangle")),
+  bad:()=>{ tone(180,0,.18,"square",.07); tone(140,.09,.2,"square",.07); },
+  coin:()=>{ tone(988,0,.08,"square",.08); tone(1319,.07,.16,"square",.08); },
+  win:()=>[523,659,784,1047,784,1047].forEach((f,i)=>tone(f,i*.11,.25,"triangle",.16))
+};
+function updateMute(){ document.querySelectorAll(".mute").forEach(b=>b.textContent=save.sound?"🔊":"🔇"); }
+document.querySelectorAll(".mute").forEach(b=>b.onclick=()=>{ save.sound=!save.sound; persist(); updateMute(); if(save.sound) SFX.tap(); });
+
+/* ---------- tutorial (first level, until the first correct word) ---------- */
+let handAnim=null;
+function startTutorial(){
+  if(save.tutorial || G.i!==0) return;
+  const target = Array.from(G.grid.placed[0].word), used=[], idx=[];
+  target.forEach(ch=>{ const i=G.letters.findIndex((c,k)=>c===ch && !used.includes(k)); used.push(i); idx.push(i); });
+  const pts=idx.map(centerOf), hand=$("hand"), tip=$("tip");
+  tip.textContent=TIP[save.lang]; tip.style.display="block"; hand.style.display="block";
+  const frames=[]; pts.forEach((p,k)=>frames.push({left:p[0]+"px",top:p[1]+"px",opacity:k===0?0:1, offset:k/(pts.length+1)}));
+  frames[0].opacity=1;
+  frames.push({left:pts[pts.length-1][0]+"px",top:pts[pts.length-1][1]+"px",opacity:0,offset:1});
+  if(handAnim) handAnim.cancel();
+  handAnim=hand.animate(frames,{duration:900*pts.length,iterations:Infinity,easing:"ease-in-out"});
+}
+function stopTutorial(){ if(handAnim){handAnim.cancel();handAnim=null;} $("hand").style.display="none"; $("tip").style.display="none"; }
+
+/* ---------- ads (replace with CrazyGames / YouTube Playables SDK) ---------- */
+function showRewardedAd(){
+  // CrazyGames: window.CrazyGames.SDK.ad.requestAd("rewarded",{adFinished:()=>resolve(true),adError:()=>resolve(false)})
+  return new Promise(res=>setTimeout(()=>res(true),600));
+}
+
+/* ---------- language ---------- */
+document.querySelectorAll("[data-lang]").forEach(b=>b.onclick=()=>{ save.lang=b.dataset.lang; persist(); openMap(); });
+$("btnLang").onclick=()=>show("lang");
+
+/* ---------- map ---------- */
+function openMap(){
+  const L=save.lang, t=T(); document.documentElement.lang=L; document.body.dir=t.dir;
+  $("mapTitle").textContent=t.title; updateCoins();
+  const list=$("mapList"); list.innerHTML="";
+  WORLD.forEach((cont,ci)=>{
+    const sec=document.createElement("div"); sec.className="continent"; sec.style.background=cont.color;
+    sec.innerHTML=`<h2>${cont.name[L]}</h2><div class="cities"></div>`;
+    cont.cities.forEach((city,k)=>{
+      const idx=CITY_LIST.findIndex(x=>x.city===city), prog=save.progress[L];
+      const b=document.createElement("button");
+      b.className="city"+(idx>prog?" locked":"")+(idx===prog?" current":"");
+      b.innerHTML=`<span>${idx<prog?"✅":idx>prog?t.locked:"✈️"}</span>${city[L]}<small>${idx+1}</small>`;
+      if(idx<=prog) b.onclick=()=>startLevel(idx);
+      sec.querySelector(".cities").appendChild(b);
+    });
+    list.appendChild(sec);
+  });
+  show("map");
+}
+
+/* ---------- game ---------- */
+let G=null;
+function startLevel(i){
+  const L=save.lang, lv=LEVELS[L][i];
+  const grid=buildGrid(lv.words);
+  G={i, grid, letters:Array.from(lv.letters), found:new Set(), hints:new Set(), sel:[], drag:false};
+  const {cont,city}=cityAt(i);
+  $("cityTitle").textContent=`${cont.name[L]} · ${city[L]}`;
+  document.querySelector("#game").style.background=cont.color.replace("135deg","180deg");
+  updateCoins(); show("game");
+  renderGrid(); renderWheel(); stopTutorial(); startTutorial();
+}
+
+function cellKey(r,c){return r+","+c;}
+function renderGrid(){
+  const g=$("grid"), {rows,cols,placed}=G.grid;
+  g.style.direction = save.lang==="ar" ? "rtl" : "ltr";   // Arabic across-words read right-to-left
+  g.style.gridTemplateColumns=`repeat(${cols},auto)`;
+  g.innerHTML=""; G.cellEls={};
+  placed.forEach(p=>p.w.forEach((ch,i)=>{
+    const r=p.r+(p.dir==="v"?i:0), c=p.c+(p.dir==="h"?i:0), k=cellKey(r,c);
+    if(G.cellEls[k]) return;
+    const d=document.createElement("div"); d.className="cell"; d.style.gridRow=r+1; d.style.gridColumn=c+1; d.dataset.ch=ch;
+    g.appendChild(d); G.cellEls[k]=d;
+  }));
+  sizeGrid(); refreshCells();
+}
+function sizeGrid(){
+  if(!G) return;
+  const a=$("gridWrap").getBoundingClientRect(), {rows,cols}=G.grid;
+  const cs=Math.max(18,Math.floor(Math.min(54,(a.width-16)/cols-4,(a.height-16)/rows-4)));
+  $("grid").style.setProperty("--cs",cs+"px");
+}
+function wordCells(p){ return p.w.map((_,i)=>cellKey(p.r+(p.dir==="v"?i:0), p.c+(p.dir==="h"?i:0))); }
+function refreshCells(){
+  const visible=new Set();
+  G.grid.placed.forEach(p=>{ if(G.found.has(p.word)) wordCells(p).forEach(k=>visible.add(k)); });
+  for(const k in G.cellEls){
+    const d=G.cellEls[k], on=visible.has(k)||G.hints.has(k);
+    if(on && !d.classList.contains("show")){ d.classList.add("show"); d.textContent=d.dataset.ch; }
+    d.classList.toggle("hint", G.hints.has(k)&&!visible.has(k));
+  }
+}
+
+function renderWheel(){
+  const w=$("wheel"); w.querySelectorAll(".ltr").forEach(e=>e.remove());
+  const vh=window.innerHeight, ws=Math.round(Math.min(270, vh*0.36, window.innerWidth-150));
+  w.style.setProperty("--ws",ws+"px");
+  const n=G.letters.length, ls=Math.round(Math.min(64, ws*(n>5?0.25:0.3)));
+  w.style.setProperty("--ls",ls+"px");
+  const rad=ws/2-ls/2-6;
+  G.letters.forEach((ch,i)=>{
+    const a=-Math.PI/2+i*2*Math.PI/n;
+    const b=document.createElement("div"); b.className="ltr"; b.textContent=ch; b.dataset.i=i;
+    b.style.left=(ws/2+rad*Math.cos(a))+"px"; b.style.top=(ws/2+rad*Math.sin(a))+"px";
+    w.appendChild(b);
+  });
+  $("lines").setAttribute("viewBox",`0 0 ${ws} ${ws}`);
+  drawLines();
+  if(handAnim) startTutorial();
+}
+function centerOf(i){ const e=$("wheel").querySelector(`.ltr[data-i="${i}"]`); return [parseFloat(e.style.left),parseFloat(e.style.top)]; }
+function drawLines(pt){
+  const pts=G.sel.map(centerOf); if(pt&&pts.length) pts.push(pt);
+  $("lines").innerHTML = pts.length>1 ? `<polyline points="${pts.map(p=>p.join(",")).join(" ")}" fill="none" stroke="#f5b83d" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>` : "";
+  $("wheel").querySelectorAll(".ltr").forEach(e=>e.classList.toggle("sel",G.sel.includes(+e.dataset.i)));
+  $("word").textContent=G.sel.map(i=>G.letters[i]).join("");
+}
+const wheel=$("wheel");
+function ltrAt(x,y){ const e=document.elementFromPoint(x,y); return e&&e.classList.contains("ltr")?+e.dataset.i:null; }
+wheel.addEventListener("pointerdown",e=>{
+  const i=ltrAt(e.clientX,e.clientY); if(i===null) return;
+  G.drag=true; G.sel=[i]; wheel.setPointerCapture(e.pointerId); $("preview").className=""; stopTutorial(); SFX.tap(0); drawLines();
+});
+wheel.addEventListener("pointermove",e=>{
+  if(!G||!G.drag) return;
+  const i=ltrAt(e.clientX,e.clientY);
+  if(i!==null){
+    if(G.sel.length>1 && G.sel[G.sel.length-2]===i) G.sel.pop();
+    else if(!G.sel.includes(i)){ G.sel.push(i); SFX.tap(G.sel.length-1); }
+  }
+  const r=wheel.getBoundingClientRect(); drawLines([e.clientX-r.left,e.clientY-r.top]);
+});
+function endDrag(){ if(!G||!G.drag) return; G.drag=false; submit(G.sel.map(i=>G.letters[i]).join("")); G.sel=[]; setTimeout(()=>{ if(!G.drag) drawLines(); },350); $("lines").innerHTML=""; }
+wheel.addEventListener("pointerup",endDrag); wheel.addEventListener("pointercancel",endDrag);
+
+function flash(cls){ const p=$("preview"); p.className=""; void p.offsetWidth; p.className=cls; }
+function submit(word){
+  if(Array.from(word).length<2){ if(!save.tutorial) setTimeout(startTutorial,400); return; }
+  const t=T(), p=G.grid.placed.find(p=>p.word===word);
+  if(p){
+    if(G.found.has(word)){ toast(t.already); flash("shake"); SFX.bad(); return; }
+    if(!save.tutorial){ save.tutorial=true; persist(); }
+    G.found.add(word); flash("good"); SFX.good(); refreshCells(); checkWin(); return;
+  }
+  if(G.grid.bonus.includes(word) && !G.found.has(word)){ G.found.add(word); save.coins+=1; persist(); updateCoins(); toast(t.bonus); flash("good"); SFX.coin(); return; }
+  flash("shake"); SFX.bad();
+  if(!save.tutorial) setTimeout(startTutorial,600);
+}
+function checkWin(){
+  // a word also counts as found if all its cells are revealed by hints/crossings
+  G.grid.placed.forEach(p=>{ if(!G.found.has(p.word) && wordCells(p).every(k=>G.cellEls[k].classList.contains("show"))) G.found.add(p.word); });
+  if(!G.grid.placed.every(p=>G.found.has(p.word))) return;
+  const L=save.lang, t=T();
+  save.coins+=10; if(save.progress[L]===G.i) save.progress[L]=Math.min(G.i+1, LEVELS[L].length); persist(); updateCoins();
+  const last = G.i+1>=LEVELS[L].length;
+  const {city}=cityAt(G.i);
+  setTimeout(()=>{
+    SFX.win();
+    $("ovCard").innerHTML=`<div class="big">${last?"🏆":"🎉"}</div><h3>${t.done}</h3><p>${city[L]} · ${t.earned}${last?"<br>"+t.allDone:""}</p>
+      <button class="bigbtn" id="ovNext">${last?t.map:t.next}</button>`;
+    $("overlay").classList.add("on");
+    $("ovNext").onclick=()=>{ $("overlay").classList.remove("on"); last?openMap():startLevel(G.i+1); };
+  },500);
+}
+
+$("btnBack").onclick=openMap;
+$("btnShuffle").onclick=()=>{ for(let i=G.letters.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[G.letters[i],G.letters[j]]=[G.letters[j],G.letters[i]];} renderWheel(); };
+$("btnHint").onclick=()=>{
+  if(save.coins<25){ toast(T().noCoins); return; }
+  const p=G.grid.placed.find(p=>!G.found.has(p.word)); if(!p) return;
+  const k=wordCells(p).find(k=>!G.cellEls[k].classList.contains("show")); if(!k) return;
+  save.coins-=25; persist(); updateCoins(); G.hints.add(k); SFX.tap(4); refreshCells(); checkWin();
+};
+$("btnAd").onclick=async()=>{ if(await showRewardedAd()){ save.coins+=25; persist(); updateCoins(); SFX.coin(); toast(T().ad); } };
+window.addEventListener("resize",()=>{ if(G&&$("game").classList.contains("on")){ sizeGrid(); renderWheel(); } });
+
+/* ---------- boot ---------- */
+updateCoins(); updateMute();
+if(save.lang) openMap(); else show("lang");
+</script>
 </body>
 </html>
